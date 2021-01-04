@@ -218,6 +218,11 @@ jobs:
           command: git clone git@github.com:hashicorp/terraform-website.git
 
       - run:
+          name: "TEMP: check out a branch where the new link checker actually exists"
+          working_directory: terraform-website
+          command: git checkout origin/dec20_pr_linkchecks
+
+      - run:
           name: Init terraform-website submodules
           working_directory: terraform-website
           command: make sync
