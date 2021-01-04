@@ -273,3 +273,7 @@ workflows:
       - build-386
       - build-amd64
       - build-arm
+
+  website-test:
+    jobs:
+      - website-link-check
