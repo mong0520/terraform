@@ -3,6 +3,10 @@ version: 2.1
 orbs:
   slack: circleci/slack@3.4.2
 
+references:
+  images:
+    middleman: &MIDDLEMAN_IMAGE docker.mirror.hashicorp.services/hashicorp/middleman-hashicorp:0.3.44
+
 executors:
   go:
     docker:
@@ -175,6 +179,72 @@ jobs:
       - run:
           name: test docker build for 'full' image
           command: docker build -t test-docker-full .
+
+  website-link-check:
+    docker:
+      - image: *MIDDLEMAN_IMAGE
+    steps:
+      - checkout
+          path: terraform
+
+      - run:
+          name: Determine changed website files, if any
+          working_directory: terraform
+          command: |
+            git diff --name-only --diff-filter=AMRCT $(
+              # find the place we diverged from the upstream branch
+              git merge-base HEAD $(
+                # find which branch we consider upstream, choosing either master or a vX.Y branch
+                for br in $(git branch -rl --format='%(refname:short)' | grep -E '^origin/(master|v\d+\.\d+)$'); do
+                  divergence=$(git rev-list --first-parent ^${br} HEAD | wc -l);
+                  echo "${br} ${divergence}";
+                done \
+                | sort -n -k2 \
+                | head -n1 \
+                | awk '{print $1}';
+              )
+            )..HEAD -- ./website/ > /tmp/changed-website-files.txt
+
+      - run:
+          name: Exit early if there's nothing to check
+          command: |
+            if [ ! -s /tmp/changed-website-files.txt ]; then
+              circleci-agent step halt
+            fi
+
+      - run:
+          name: Check out terraform-website repo
+          command: git clone git@github.com:hashicorp/terraform-website.git
+
+      - run:
+          name: Init terraform-website submodules
+          working_directory: terraform-website
+          command: make sync
+
+      - run:
+          name: Override terraform submodule to use current branch
+          working_directory: terraform-website/ext/terraform
+          command: git fetch ../../../terraform/.git HEAD && git checkout FETCH_HEAD
+
+      - run:
+          name: Set up terraform-website dependencies
+          working_directory: terraform-website/content
+          command: bundle check || bundle install --path vendor/bundle --retry=3
+
+      - run:
+          name: Run middleman in background
+          working_directory: terraform-website/content
+          background: true
+          command: bundle exec middleman server
+
+      - run:
+          name: Wait for server to start
+          command: until curl -sS http://localhost:4567/ > /dev/null; do sleep 1; done
+
+      - run:
+          name: Check links in changed pages
+          working_directory: terraform-website/content
+          command: cat /tmp/changed-website-files.txt | bundle exec ./scripts/check-pr-links.rb
 
 workflows:
   version: 2
