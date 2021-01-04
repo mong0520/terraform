@@ -191,19 +191,20 @@ jobs:
           name: Determine changed website files, if any
           working_directory: terraform
           command: |
-            git diff --name-only --diff-filter=AMRCT $(
-              # find the place we diverged from the upstream branch
-              git merge-base HEAD $(
-                # find which branch we consider upstream, choosing either master or a vX.Y branch
-                for br in $(git branch -rl --format='%(refname:short)' | grep -E '^origin/(master|v\d+\.\d+)$'); do
-                  divergence=$(git rev-list --first-parent ^${br} HEAD | wc -l);
-                  echo "${br} ${divergence}";
-                done \
-                | sort -n -k2 \
-                | head -n1 \
-                | awk '{print $1}';
-              )
-            )..HEAD -- ./website/ > /tmp/changed-website-files.txt
+            UPSTREAM_BRANCH=$(
+              # Figure out what the current branch forked from -- should be either master or a vX.Y branch.
+              for br in $(git branch -rl --format='%(refname:short)' | grep -E '^origin/(master|v\d+\.\d+)$'); do
+                new_commits=$(git rev-list --first-parent ^${br} HEAD | wc -l);
+                echo "${br} ${new_commits}";
+              done \
+              | sort -n -k2 \
+              | head -n1 \
+              | awk '{print $1}';
+            )
+            echo "Checking current branch against: ${UPSTREAM_BRANCH}"
+            UPSTREAM_MERGE_BASE=$(git merge-base HEAD ${UPSTREAM_BRANCH})
+            git diff --name-only --diff-filter=AMRCT ${UPSTREAM_MERGE_BASE}..HEAD -- ./website/ > /tmp/changed-website-files.txt
+            echo "Changed website files:"
             cat /tmp/changed-website-files.txt
 
       - run:
