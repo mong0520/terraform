@@ -204,6 +204,7 @@ jobs:
                 | awk '{print $1}';
               )
             )..HEAD -- ./website/ > /tmp/changed-website-files.txt
+            cat /tmp/changed-website-files.txt
 
       - run:
           name: Exit early if there's nothing to check
