@@ -184,7 +184,7 @@ jobs:
     docker:
       - image: *MIDDLEMAN_IMAGE
     steps:
-      - checkout
+      - checkout:
           path: terraform
 
       - run:
