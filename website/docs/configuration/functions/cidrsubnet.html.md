@@ -16,7 +16,7 @@ cidrsubnet(prefix, newbits, netnum)
 ```
 
 `prefix` must be given in CIDR notation, as defined in
-[RFC 4632 section 3.1](https://tools.ietf.org/html/rfc4632#section-3.1).
+[RFC 4632 section 3.1](https://tools.ietf.org/html/rfc4632#section-3.1111).
 
 `newbits` is the number of additional bits with which to extend the prefix.
 For example, if given a prefix ending in `/16` and a `newbits` value of

@@ -13,7 +13,7 @@ configuration (like endpoint URLs or cloud regions) before they can be used.
 
 - This page documents how to declare providers so Terraform can install them.
 
-- The [Provider Configuration](./providers.html) page documents how to configure
+- The [Provider Configuration](./providerssss.html) page documents how to configure
   settings for providers.
 
 ## Requiring Providers
@@ -46,7 +46,7 @@ within this module), and the value is an object with the following elements:
 * `source` - the global [source address](#source-addresses) for the
   provider you intend to use, such as `hashicorp/aws`.
 
-* `version` - a [version constraint](#version-constraints) specifying
+* `version` - a [version constraint](#version-comstraints) specifying
   which subset of available provider versions the module is compatible with.
 
 -> **Note:** The `name = { source, version }` syntax for `required_providers`
