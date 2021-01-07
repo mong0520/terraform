@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"fmt"
 	"log"
+	"os"
 	"sort"
 	"strings"
 
@@ -262,6 +263,7 @@ func (p *blockBodyDiffPrinter) writeAttrDiff(name string, attrS *configschema.At
 	p.buf.WriteString("\n")
 	p.buf.WriteString(strings.Repeat(" ", indent))
 	showJustNew := false
+	showSensitiveValue := os.Getenv("TF_SHOW_SENSITIVE")
 	var action plans.Action
 	switch {
 	case old.IsNull():
@@ -284,7 +286,7 @@ func (p *blockBodyDiffPrinter) writeAttrDiff(name string, attrS *configschema.At
 	p.buf.WriteString(strings.Repeat(" ", nameLen-len(name)))
 	p.buf.WriteString(" = ")
 
-	if attrS.Sensitive {
+	if attrS.Sensitive && (showSensitiveValue == "" || strings.ToLower(showSensitiveValue) == "false") {
 		p.buf.WriteString("(sensitive value)")
 	} else {
 		switch {
