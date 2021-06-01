@@ -1,10 +1,11 @@
 package terraform
 
 import (
-	"log"
-
-	"github.com/hashicorp/terraform/addrs"
-	"github.com/hashicorp/terraform/dag"
+    "github.com/hashicorp/terraform/addrs"
+    "github.com/hashicorp/terraform/dag"
+    "github.com/hashicorp/terraform/tfdiags"
+    "log"
+    "strings"
 )
 
 // GraphNodeTargetable is an interface for graph nodes to implement when they
@@ -49,12 +50,66 @@ type TargetsTransformer struct {
 	Destroy bool
 }
 
+
+func (t *TargetsTransformer) parseTargetAddresses() ([]addrs.Targetable, []addrs.Targetable, error) {
+    var targeted, excluded []addrs.Targetable
+    for _, target := range t.Targets {
+        targetString := target.String()
+        exclude := string(targetString[0]) == "X"
+        if exclude {
+            targetString = targetString[1:]
+            log.Printf("[DEBUG] Excluding %s", targetString)
+        }
+
+        var inst addrs.Targetable
+        var diags tfdiags.Diagnostics
+        switch target.(type) {
+        case addrs.ModuleInstance:
+            inst, diags = addrs.ParseModuleInstanceStr(targetString)
+            if diags.HasErrors() {
+                log.Println(diags.Err())
+                return nil, nil, diags.Err()
+            }
+        case addrs.AbsResource:
+            inst, diags = addrs.ParseAbsResourceStr(targetString)
+            if diags.HasErrors() {
+                log.Println(diags.Err())
+                return nil, nil, diags.Err()
+            }
+        case addrs.AbsResourceInstance:
+            inst, diags = addrs.ParseAbsResourceInstanceStr(targetString)
+            if diags.HasErrors() {
+                log.Println(diags.Err())
+                return nil, nil, diags.Err()
+            }
+        }
+
+        if exclude {
+            excluded = append(excluded, inst)
+        } else {
+            targeted = append(targeted, inst)
+        }
+    }
+    return targeted, excluded, nil
+}
+
 func (t *TargetsTransformer) Transform(g *Graph) error {
 	if len(t.Targets) > 0 {
-		targetedNodes, err := t.selectTargetedNodes(g, t.Targets)
+
+        targeted, excluded, err := t.parseTargetAddresses()
+        if err != nil {
+            return err
+        }
+
+		targetedNodes, err := t.selectTargetedNodes(g, targeted)
 		if err != nil {
 			return err
 		}
+
+        excludedNodes, err := t.selectTargetedNodes(g, excluded)
+        if err != nil {
+            return err
+        }
 
 		for _, v := range g.Vertices() {
 			removable := false
@@ -66,10 +121,22 @@ func (t *TargetsTransformer) Transform(g *Graph) error {
 				removable = vr.RemoveIfNotTargeted()
 			}
 
-			if removable && !targetedNodes.Include(v) {
-				log.Printf("[DEBUG] Removing %q, filtered by targeting.", dag.VertexName(v))
-				g.Remove(v)
-			}
+            if removable {
+                if len(targeted) > 0 && !targetedNodes.Include(v) {
+                    log.Printf("[DEBUG] Removing %q, filtered by targeting.\n", dag.VertexName(v))
+                    g.Remove(v)
+                } else if len(excluded) > 0 && excludedNodes.Include(v) {
+                    if strings.HasPrefix(dag.VertexName(v), "provider.") ||
+                        strings.HasPrefix(dag.VertexName(v), "local.") ||
+                        strings.HasPrefix(dag.VertexName(v), "data.") ||
+                        strings.HasPrefix(dag.VertexName(v), "outputs.") ||
+                        strings.HasPrefix(dag.VertexName(v), "var.") {
+                        continue
+                    }
+                    log.Printf("[DEBUG] Removing %s, filtered by excluding.\n", dag.VertexName(v))
+                    g.Remove(v)
+                }
+            }
 		}
 	}
 
